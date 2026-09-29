@@ -1,0 +1,30 @@
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Murmur Artifacts
+*.log
+logs/
+*.db
+data/
+.murmur_cache/
+allowlist.txt
+!allowlist.txt.example
+
+# Python & Venv
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
