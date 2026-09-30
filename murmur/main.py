@@ -5,9 +5,8 @@ from murmur.core.detector import SecretDetector
 from murmur.alerting.console import ConsoleAlerter
 
 def main() -> int:
-    repo_path = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path.cwd()
     try:
-        adapter = GitHookAdapter(repo_path=repo_path, hook_type="pre-commit")
+        adapter = GitHookAdapter(repo_path=Path.cwd(), hook_type="pre-commit")
         changes = adapter.get_changes()
     except AdapterError as e:
         print(f"[MURMUR] Adapter failed: {e}", file=sys.stderr)

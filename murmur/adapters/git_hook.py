@@ -3,17 +3,17 @@ from __future__ import annotations
 import re
 import subprocess
 from pathlib import Path
-from typing import Iterable, Literal
+from typing import Literal
 
 from murmur.adapters.base import BaseAdapter
 from murmur.core.models import ChangeLine
 
+
 class AdapterError(RuntimeError):
     pass
 
+
 class GitHookAdapter(BaseAdapter):
-    # Git empty tree SHA. Used for the initial commit.
-    EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee490457a39f4d"
     HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 
     def __init__(
@@ -27,9 +27,6 @@ class GitHookAdapter(BaseAdapter):
         self.hook_type = hook_type
         self.timeout_sec = timeout_sec
         self.max_line_length = max_line_length
-
-# murmur/adapters/git_hook.py
-# ... existing code ...
 
     def get_changes(self) -> list[dict]:
         changed_files = self._changed_files()
@@ -58,7 +55,6 @@ class GitHookAdapter(BaseAdapter):
         }
 
     def _binary_files(self) -> set[str]:
-        # Git marks binary files in numstat as: "-\t-\tpath"
         proc = self._run_git(self._diff_args(["--numstat", "-z", "--diff-filter=ACMR"]))
         result: set[str] = set()
         for raw in proc.stdout.split(b"\0"):
@@ -69,30 +65,14 @@ class GitHookAdapter(BaseAdapter):
                 result.add(self._normalize_path(parts[2]))
         return result
 
-    def _diff_args(self, extra: list[str]) -> list[str]:
-        # pre-commit must scan the index, not the working tree.
-        if self.hook_type == "pre-commit":
-            args = ["diff", "--cached", *extra]
-            if not self._head_exists():
-                args.append(self.EMPTY_TREE)
-            return args
-        return ["diff", *extra, self._previous_commit(), "HEAD"]
-
-    def _previous_commit(self) -> str:
-        proc = self._run_git(["rev-parse", "--verify", "HEAD~1"], ok_exit=(0, 1, 128))
-        if proc.returncode == 0:
-            return self._decode(proc.stdout).strip() or self.EMPTY_TREE
-        return self.EMPTY_TREE
-
     def _ignored_files(self, paths: set[str]) -> set[str]:
-        # Excludes .gitignore-matched files, including force-staged ones.
         if not paths:
             return set()
         stdin_data = (
             b"\0".join(p.encode("utf-8", "surrogatepass") for p in sorted(paths)) + b"\0"
         )
         proc = self._run_git(
-            ["check-ignore", "-z", "--stdin"],
+            ["check-ignore", "--no-index", "-z", "--stdin"],
             input_bytes=stdin_data,
             ok_exit=(0, 1),
         )
@@ -101,6 +81,75 @@ class GitHookAdapter(BaseAdapter):
             for p in proc.stdout.split(b"\0")
             if p
         }
+
+    def _diff_args(self, extra: list[str]) -> list[str]:
+        if self.hook_type == "pre-commit":
+            # git diff --cached natively handles unborn HEAD (initial commit).
+            return ["diff", "--cached", *extra]
+
+        parent = self._parent_ref()
+        if parent:
+            return ["diff", *extra, parent, "HEAD"]
+
+        # Root commit in post-commit: git show diffs against empty tree natively.
+        return ["show", "--format=", *extra, "HEAD"]
+
+    def _parent_ref(self) -> str | None:
+        cmd = ["git", "-C", str(self.repo_path), "rev-parse", "--verify", "HEAD~1"]
+        proc = subprocess.run(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=self.timeout_sec,
+            check=False,
+        )
+        return "HEAD~1" if proc.returncode == 0 else None
+
+    def _parse_diff(self, diff_text: str, allowed_files: set[str]) -> list[dict]:
+        current_file: str | None = None
+        line_number: int | None = None
+        changes: list[dict] = []
+
+        for raw_line in diff_text.splitlines():
+            if raw_line.startswith("+++ "):
+                target = self._extract_diff_path(raw_line[4:])
+                current_file = target if target in allowed_files else None
+                continue
+
+            hunk = self.HUNK_RE.match(raw_line)
+            if hunk:
+                line_number = int(hunk.group(1))
+                continue
+
+            if current_file and line_number and raw_line.startswith("+"):
+                content = raw_line[1:].rstrip("\r")
+                if 0 < len(content) <= self.max_line_length:
+                    changes.append(
+                        ChangeLine(file=current_file, line_number=line_number, content=content).model_dump()
+                    )
+                line_number += 1
+            elif raw_line.startswith(" "):
+                if line_number:
+                    line_number += 1
+
+        return changes
+
+    def _extract_diff_path(self, raw: str) -> str:
+        target = raw.strip().strip('"')
+        if target.startswith("b/"):
+            target = target[2:]
+        return self._normalize_path(target)
+
+    def _normalize_path(self, path: str | bytes) -> str:
+        if isinstance(path, bytes):
+            path = self._decode(path)
+        return Path(path.strip()).as_posix()
+
+    def _decode(self, data: bytes) -> str:
+        try:
+            return data.decode("utf-8")
+        except UnicodeDecodeError:
+            return data.decode("latin-1")
 
     def _run_git(
         self,
@@ -120,12 +169,9 @@ class GitHookAdapter(BaseAdapter):
             )
         except subprocess.TimeoutExpired as exc:
             raise AdapterError("git timeout") from exc
+
         if proc.returncode not in ok_exit:
-            raise AdapterError(f"git returned {proc.returncode}")
+            stderr_tail = proc.stderr.decode("utf-8", errors="replace").strip()[-500:]
+            raise AdapterError(f"git returned {proc.returncode}: {stderr_tail}")
+
         return proc
-
-# ... existing code ...
-
-    def _head_exists(self) -> bool:
-        proc = subprocess.run(["git", "-C", str(self.repo_path), "rev-parse", "--verify", "HEAD"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return proc.returncode == 0
