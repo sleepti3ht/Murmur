@@ -140,21 +140,14 @@ murmur/
 ├── murmur/
 │   ├── __init__.py
 │   ├── main.py
-│   ├── adapters/
-│   │   ├── __init__.py
-│   │   ├── base.py
-│   │   └── git_hook.py
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── models.py
-│   │   └── detector.py
-│   └── alerting/
-│       ├── __init__.py
-│       └── console.py
-├── tests/
-│   └── test_detector.py
+│   ├── history.py
+│   ├── adapters/   (base.py, git_hook.py)
+│   ├── core/       (models.py, detector.py)
+│   ├── alerting/   (console.py)
+│   └── storage/    (sqlite.py)
+├── tools/          (make_test_repo.py, murmur_tray.py)
+├── tests/          (test_detector.py)
 ├── allowlist.txt.example
-├── .gitignore
 ├── pyproject.toml
 └── README.md
 ```
