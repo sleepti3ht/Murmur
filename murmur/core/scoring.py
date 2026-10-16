@@ -6,7 +6,7 @@ Combines multiple signals to produce a confidence level:
 - Rule specificity (provider-specific rules are higher confidence)
 - Shannon entropy (higher entropy = more likely to be a real secret)
 - String length (very short strings are less likely to be secrets)
-- Placeholder detection (common dummy values are filtered out)
+- Placeholder detection (common dummy values are filtered)
 
 Confidence levels:
 - "high": Provider-specific rule OR high entropy + sufficient length
@@ -26,20 +26,24 @@ HIGH_CONFIDENCE_RULES = {
     "private_key",
 }
 
-# Common placeholder patterns that should be classified as noise
-PLACEHOLDER_PATTERNS = {
+# Exact-match placeholders: the entire value (lowered, stripped) equals one of these
+EXACT_PLACEHOLDERS = {
     "example",
-    "changeme",
     "dummy",
+    "changeme",
     "placeholder",
-    "your_",
-    "your-",
     "test",
     "sample",
-    "todo",
-    "xxx",
+}
+
+# Prefix-based placeholders: value starts with one of these
+PREFIX_PLACEHOLDERS = {
+    "your_",
+    "your-",
     "insert_",
     "replace_",
+    "todo",
+    "xxx",
 }
 
 
@@ -47,13 +51,17 @@ def is_placeholder(value: str) -> bool:
     """
     Check if a value looks like a placeholder or dummy value.
 
+    Uses exact-match for common words and prefix-match for template patterns.
+    Avoids substring matching to prevent false positives on real secrets
+    like "AKIAIOSFODNN7EXAMPLE" (contains "example" as suffix).
+
     Args:
         value: The candidate secret string.
 
     Returns:
         True if the value appears to be a placeholder.
     """
-    lowered = value.lower()
+    lowered = value.strip().lower()
 
     # Environment variable syntax: ${VAR_NAME}
     if lowered.startswith("${") and lowered.endswith("}"):
@@ -63,8 +71,12 @@ def is_placeholder(value: str) -> bool:
     if lowered.startswith("<") and lowered.endswith(">"):
         return True
 
-    # Check for common placeholder substrings
-    return any(marker in lowered for marker in PLACEHOLDER_PATTERNS)
+    # Exact match for common dummy words
+    if lowered in EXACT_PLACEHOLDERS:
+        return True
+
+    # Prefix match for template patterns
+    return any(lowered.startswith(prefix) for prefix in PREFIX_PLACEHOLDERS)
 
 
 def compute_confidence(rule_id: str, secret: str) -> str:
@@ -91,11 +103,11 @@ def compute_confidence(rule_id: str, secret: str) -> str:
     length = len(secret)
 
     # High entropy + sufficient length = likely real secret
-    if entropy >= 4.5 and length >= 20:
+    if entropy >= 4.0 and length >= 16:
         return "high"
 
     # Moderate entropy + reasonable length = possible secret
-    if entropy >= 3.8 and length >= 16:
+    if entropy >= 3.5 and length >= 12:
         return "medium"
 
     # Low entropy or very short = likely false positive
