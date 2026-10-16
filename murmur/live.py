@@ -54,7 +54,7 @@ def stream_events():
             
             for f in findings:
                 print(f"  \033[93m-> DETECTED: {f['rule_id']} in {f['file']}:{f['line_number']}\033[0m")
-                print(f"     Mask: {f['masked_secret']} | Hash: {f['hash'][:16]}...")
+                print(f"     Mask: {f['masked']} | Hash: {f['hash'][:16]}...")
                 last_finding_id = f['id']
                 
         except sqlite3.OperationalError:
