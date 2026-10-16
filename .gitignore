@@ -1,58 +1,65 @@
-# Environment & Secrets
-.env
-.env.*
-!.env.example
-*.pem
-*.key
-secrets/
-
-# Murmur Artifacts
-*.log
-logs/
-*.db
-data/
-.murmur_cache/
-allowlist.txt
-!allowlist.txt.example
-
-# Python & Venv
+# === Python ===
 __pycache__/
 *.py[cod]
-.venv/
-venv/
-*.egg-info/
-dist/
-build/
-
-# IDE & OS
-.vscode/
-.idea/
-.DS_Store
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
+*$py.class
 *.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Virtual environments
+# === Virtual Environments ===
 .venv/
 venv/
 ENV/
 env/
+.env
 
-# IDE
+# === IDE ===
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+.project
+.pydevproject
+.settings/
 
-# OS
+# === Testing ===
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# === Tauri / Rust Build Artifacts (ВАЖНО!) ===
+**/target/
+**/Tauri/target/
+*.pdb
+*.dll
+*.exe
+*.so
+*.dylib
+
+# === OS ===
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# === Temporary files ===
+*.tmp
+*.temp
+*.log
