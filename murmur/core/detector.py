@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from fnmatch import fnmatch
 from pathlib import PurePosixPath
-
+from murmur.core.scoring import compute_confidence
 from murmur.core.models import ChangeLine, DetectionResult
 
 @dataclass(frozen=True)
@@ -63,11 +63,19 @@ class SecretDetector:
                 secret_hash = self._sha256(secret)
                 if secret_hash in self.hash_allowlist: continue
 
+                # Compute confidence level
+                confidence = compute_confidence(rule.rule_id, secret)
+
+                # Skip noise-level findings
+                if confidence == "noise":
+                    continue
+
                 findings.append(DetectionResult(
                     file=line.file, line_number=line.line_number, rule_id=rule.rule_id,
-                    severity=rule.severity, hashed_secret=secret_hash, masked_secret=self._mask(secret)
+                    severity=rule.severity, hashed_secret=secret_hash, masked_secret=self._mask(secret),
+                    confidence=confidence
                 ).model_dump())
-                break # Stop at first match per line for MVP
+                break
         return findings
 
     def _is_path_allowed(self, path: str) -> bool:

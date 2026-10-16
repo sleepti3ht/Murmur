@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS findings (
     masked TEXT NOT NULL,
     hash TEXT NOT NULL,
     action TEXT NOT NULL,
+    confidence TEXT NOT NULL DEFAULT 'medium',
     UNIQUE (repo, file, line_number, hash, action)
 );
 """
@@ -48,8 +49,8 @@ def record_findings(findings: list[dict], repo: str, action: str) -> None:
     with sqlite3.connect(DB_PATH, timeout=10) as con:
         con.execute("PRAGMA journal_mode=WAL;")
         con.executemany(
-            "INSERT OR IGNORE INTO findings(repo, file, line_number, rule_id, masked, hash, action) "
-            "VALUES (?,?,?,?,?,?,?)",
+            "INSERT OR IGNORE INTO findings(repo, file, line_number, rule_id, masked, hash, action, confidence) "
+            "VALUES (?,?,?,?,?,?,?,?)",
             [
                 (
                     repo,
@@ -59,6 +60,7 @@ def record_findings(findings: list[dict], repo: str, action: str) -> None:
                     f["masked_secret"],
                     f["hashed_secret"],
                     action,
+                    f.get("confidence", "medium"),
                 )
                 for f in findings
             ],

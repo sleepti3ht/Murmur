@@ -12,3 +12,4 @@ class DetectionResult(BaseModel):
     severity: str
     hashed_secret: str
     masked_secret: str
+    confidence: str = "medium" # New field: "high", "medium", "low", "noise"
