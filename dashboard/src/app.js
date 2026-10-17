@@ -1,6 +1,7 @@
 // dashboard/src/app.js
 const API_BASE = "http://127.0.0.1:8000/api";
 let allFindings = [];
+let refreshInterval = null;
 
 async function loadData() {
     try {
@@ -17,9 +18,18 @@ async function loadData() {
         updateStats(allFindings, runs);
         renderFindings(allFindings);
         renderRules(rules.rules);
+        renderRuns(runs);
     } catch (err) {
         console.error("Failed to load data:", err);
     }
+}
+
+function startAutoRefresh() {
+    if (refreshInterval) clearInterval(refreshInterval);
+    refreshInterval = setInterval(() => {
+        console.log("Auto-refreshing data...");
+        loadData();
+    }, 30000); 
 }
 
 function updateStats(findings, runs) {
@@ -96,4 +106,5 @@ document.addEventListener("DOMContentLoaded", () => {
     
     setupTabs();
     loadData();
+    startAutoRefresh(); 
 });
