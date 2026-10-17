@@ -17,13 +17,32 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-/// Owns the FastAPI child process so it terminates with the app.
+/// Owns the API child process so it terminates together with the app.
 struct ApiGuard(Mutex<Option<Child>>);
 
-/// Spawn dashboard/api.py using MURMUR_HOME / MURMUR_PYTHON env config.
-/// Fail-open: returns None when config is missing, the dashboard then
-/// shows empty data instead of crashing the shell.
+/// Spawn the FastAPI backend.
+/// Priority 1: bundled sidecar next to the executable (onefile or onedir layout).
+/// Priority 2: MURMUR_HOME + MURMUR_PYTHON env config (development mode).
+/// Fail-open: returns None when neither source exists.
 fn spawn_api() -> Option<Child> {
+    // Portable mode: sidecar next to the executable
+    if let Ok(exe) = std::env::current_exe() {
+        let parent = exe.parent()?;
+        let candidates = [
+            parent.join("murmur-api.exe"),
+            parent.join("murmur-api").join("murmur-api.exe"),
+        ];
+        for sidecar in candidates {
+            if sidecar.exists() {
+                let mut cmd = Command::new(sidecar);
+                #[cfg(windows)]
+                cmd.creation_flags(CREATE_NO_WINDOW);
+                return cmd.spawn().ok();
+            }
+        }
+    }
+
+    // Development mode: venv interpreter + project root from env
     let home = std::env::var("MURMUR_HOME").ok()?;
     let script = std::path::Path::new(&home).join("dashboard").join("api.py");
     if !script.exists() {
@@ -33,18 +52,35 @@ fn spawn_api() -> Option<Child> {
 
     let mut cmd = Command::new(python);
     cmd.arg(&script).env("PYTHONPATH", &home);
-
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
 
     cmd.spawn().ok()
 }
 
-/// Kill and reap the child to avoid zombie processes and leaked OS handles.
+/// Kill the child and its entire process tree.
+/// PyInstaller --onefile binaries spawn a bootloader + real child on Windows;
+/// killing only the direct child would orphan the real server holding port 8000.
 fn kill_api(guard: &ApiGuard) {
     if let Ok(mut slot) = guard.0.lock() {
-        if let Some(mut child) = slot.take() {
-            let _ = child.kill();
+        if let Some(mut child) = slot.take() { // FIXED: added mut
+            let pid = child.id();
+
+            #[cfg(windows)]
+            {
+                // /T = kill entire tree, /F = force
+                let _ = Command::new("taskkill")
+                    .args(["/PID", &pid.to_string(), "/T", "/F"])
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .output();
+            }
+
+            #[cfg(not(windows))]
+            {
+                let _ = child.kill();
+            }
+
+            // Reap the direct child to release the OS handle
             let _ = child.wait();
         }
     }
@@ -65,8 +101,15 @@ fn toggle_window(app: &tauri::AppHandle) {
 
 fn main() {
     let app = tauri::Builder::default()
+        // Prevent duplicate instances: second launch focuses the existing window
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .setup(|app| {
-            // Start Python API before the UI issues its first fetch
+            // Start the API before the UI issues its first fetch
             app.manage(ApiGuard(Mutex::new(spawn_api())));
 
             let toggle_i = MenuItem::with_id(app, "toggle", "Show/Hide", true, None::<&str>)?;

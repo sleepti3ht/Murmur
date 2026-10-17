@@ -197,6 +197,39 @@ function startAutoRefresh() {
     refreshTimer = setInterval(loadData, REFRESH_INTERVAL_MS);
 }
 
+/// Probe /api/status with a hard timeout so a hung connection cannot stall the loop.
+async function probeStatus(timeoutMs = 1500) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const res = await fetch(`${API_BASE}/status`, { signal: controller.signal });
+        return res.ok;
+    } catch (_) {
+        return false;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+/// Poll the status endpoint until reachable (spawn race mitigation).
+async function waitForApi(maxAttempts = 10, delayMs = 2000) {
+    for (let i = 0; i < maxAttempts; i++) {
+        if (await probeStatus()) return true;
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    return false;
+}
+
+/// Load data in background; UI interactivity must never depend on API readiness.
+async function bootstrap() {
+    const ready = await waitForApi();
+    if (!ready) {
+        console.warn("Murmur API unreachable; dashboard keeps polling in background");
+    }
+    loadData();
+    startAutoRefresh();
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     document.documentElement.setAttribute("data-theme", localStorage.getItem("theme") || "dark");
     document.getElementById("theme-toggle").addEventListener("click", () => {
@@ -221,7 +254,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (e.key === "Escape" && !modal().hidden) closeModal();
     });
 
+    // UI wiring is synchronous and completes immediately, so tabs/buttons work
+    // even while the API is still booting in background.
     setupTabs();
-    loadData();
-    startAutoRefresh();
+    bootstrap();
 });
