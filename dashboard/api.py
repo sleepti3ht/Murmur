@@ -13,6 +13,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from murmur.core.detector import RULES, Rule, SecretDetector, _load_custom_rules
+from murmur.core.entropy import shannon_entropy
+from murmur.core.scoring import compute_confidence
 from murmur.storage.sqlite import recent_findings, recent_runs
 
 app = FastAPI(title="Murmur Dashboard API")
@@ -41,6 +44,11 @@ class RuleRequest(BaseModel):
     pattern: str = Field(min_length=1)
     severity: str = "medium"
     description: str = ""
+
+
+class PlaygroundRequest(BaseModel):
+    text: str
+    pattern: str | None = None
 
 
 def load_custom_rules() -> list[dict]:
@@ -122,6 +130,45 @@ async def delete_rule(rule_id: str):
         raise HTTPException(status_code=404, detail="Rule not found")
     save_custom_rules(filtered)
     return {"rules": filtered}
+
+
+@app.post("/api/playground")
+async def playground(request: PlaygroundRequest):
+    """Test arbitrary text against active rules plus an optional one-off regex."""
+    rules = list(RULES) + _load_custom_rules()
+    if request.pattern:
+        try:
+            compiled = re.compile(request.pattern)
+        except re.error as e:
+            raise HTTPException(status_code=422, detail=f"Invalid regex: {e}")
+        rules.append(
+            Rule(
+                rule_id="playground.oneoff",
+                pattern=compiled,
+                severity="medium",
+                secret_group=1 if compiled.groups else 0,
+            )
+        )
+
+    detector = SecretDetector()
+    results = []
+    for rule in rules:
+        match = rule.pattern.search(request.text)
+        if not match:
+            continue
+        secret = match.group(rule.secret_group).strip().strip("'\"")
+        if not secret or detector._is_placeholder(secret):
+            continue
+        results.append(
+            {
+                "rule_id": rule.rule_id,
+                "masked": SecretDetector._mask(secret),
+                "entropy": round(shannon_entropy(secret), 2),
+                "confidence": compute_confidence(rule.rule_id, secret),
+                "severity": rule.severity,
+            }
+        )
+    return {"results": results}
 
 
 @app.post("/api/scan")

@@ -22,9 +22,9 @@ class ConsoleAlerter:
                 "medium": "[*]",
                 "low": "[.]",
             }.get(r.confidence, "[ ]")
-            
+            commit_part = f" | Commit: {r.commit_sha[:8]}" if r.commit_sha else ""
             print(
                 f"  {confidence_marker} {r.file}:{r.line_number} | "
                 f"Rule: {r.rule_id} | Confidence: {r.confidence.upper()} | "
-                f"Mask: {r.masked_secret} | SHA256: {r.hashed_secret[:12]}..."
+                f"Mask: {r.masked_secret} | SHA256: {r.hashed_secret[:12]}...{commit_part}"
             )

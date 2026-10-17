@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 from murmur.adapters.base import BaseAdapter
@@ -18,9 +19,10 @@ class HistoryAdapter(BaseAdapter):
     Scans repository history for secrets.
     Useful for one-time audits when onboarding a new project.
     """
-    
-    HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
-    
+
+    # Matches hunk header with optional trailing context after @@
+    HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@.*")
+
     def __init__(
         self,
         repo_path: Path | str = Path.cwd(),
@@ -37,31 +39,45 @@ class HistoryAdapter(BaseAdapter):
         """
         Scan repository history and return all added lines.
         """
-        # Get all commits with diffs
         proc = self._run_git([
             "log", "-p",
             f"-n {self.max_commits}",
-            "--all",
             "--no-color",
             "--unified=0",
         ])
-        
+
         if proc.returncode != 0:
+            print(f"[MURMUR] git log failed: {proc.stderr.decode()}", file=sys.stderr)
             return []
-        
+
         diff_text = self._decode(proc.stdout)
         return self._parse_history_diff(diff_text)
 
     def _parse_history_diff(self, diff_text: str) -> list[dict]:
         """
-        Parse git log -p output and extract added lines.
+        Parse git log -p output and extract added lines with commit attribution.
         """
         current_file: str | None = None
         line_number: int | None = None
+        commit_sha: str | None = None
+        author: str | None = None
+        commit_ts: str | None = None
         changes: list[dict] = []
 
         for raw_line in diff_text.splitlines():
-            # New file header
+            # Commit metadata headers emitted by `git log -p`
+            if raw_line.startswith("commit "):
+                commit_sha = raw_line.split()[1]
+                author = None
+                commit_ts = None
+                continue
+            if raw_line.startswith("Author: "):
+                author = raw_line[len("Author: "):].strip()
+                continue
+            if raw_line.startswith("Date: "):
+                commit_ts = raw_line[len("Date: "):].strip()
+                continue
+            # New file header resets context
             if raw_line.startswith("diff --git "):
                 current_file = None
                 line_number = None
@@ -73,7 +89,7 @@ class HistoryAdapter(BaseAdapter):
                 current_file = target if target else None
                 continue
 
-            # Hunk header
+            # Hunk header sets the starting line number
             hunk = self.HUNK_RE.match(raw_line)
             if hunk:
                 line_number = int(hunk.group(1))
@@ -88,6 +104,9 @@ class HistoryAdapter(BaseAdapter):
                             file=current_file,
                             line_number=line_number,
                             content=content,
+                            commit_sha=commit_sha,
+                            author=author,
+                            commit_ts=commit_ts,
                         ).model_dump()
                     )
                 line_number += 1

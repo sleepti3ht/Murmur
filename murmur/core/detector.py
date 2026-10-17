@@ -106,12 +106,18 @@ class SecretDetector:
         "your_token", "secret", "password"
     }
 
-    def __init__(self, allowlist: list[str] | None = None, dry_run: bool | None = None) -> None:
+    def __init__(
+        self,
+        allowlist: list[str] | None = None,
+        dry_run: bool | None = None,
+        baseline_hashes: set[str] | None = None,
+    ) -> None:
         if dry_run is None:
             self.dry_run = os.getenv("DRY_RUN", "1").lower() not in {"0", "false", "no", "off"}
         else:
             self.dry_run = dry_run
-            
+        self.baseline_hashes: set[str] = baseline_hashes or set()
+        self.baseline_skipped = 0            
         self.path_allowlist: set[str] = set()
         self.hash_allowlist: set[str] = set()
         
@@ -172,7 +178,10 @@ class SecretDetector:
                 secret_hash = self._sha256(secret)
                 if secret_hash in self.hash_allowlist:
                     continue
-
+                # Suppress findings already accepted as baseline debt
+                if secret_hash in self.baseline_hashes:
+                    self.baseline_skipped += 1
+                    continue
                 # Determine confidence: use override if available, else compute
                 if rule.rule_id in self.confidence_overrides:
                     confidence = self.confidence_overrides[rule.rule_id]
@@ -192,6 +201,9 @@ class SecretDetector:
                         hashed_secret=secret_hash,
                         masked_secret=self._mask(secret),
                         confidence=confidence,
+                        commit_sha=line.commit_sha,
+                        author=line.author,
+                        commit_ts=line.commit_ts,
                     ).model_dump()
                 )
                 # Stop after first match per line to avoid duplicate alerts

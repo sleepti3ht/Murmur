@@ -216,3 +216,15 @@ code { background: var(--bg-secondary); padding: 0.2rem 0.4rem; border-radius: 4
 
 /* Stat cards stay compact regardless of content below the grid */
 .stats-grid { align-items: start; }
+/* Playground inputs */
+textarea {
+    width: 100%;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 0.7rem;
+    font-family: "SF Mono", "Monaco", "Inconsolata", "Fira Mono", monospace;
+    font-size: 0.875rem;
+    resize: vertical;
+}

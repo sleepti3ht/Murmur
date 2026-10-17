@@ -39,9 +39,10 @@ function renderFindings(findings) {
     const filter = document.getElementById("confidence-filter").value;
     const rows = filter === "all" ? findings : findings.filter((f) => f.confidence === filter);
 
-    tbody.innerHTML = rows
-        .map(
-            (f) => `
+    tbody.innerHTML = rows.length
+        ? rows
+            .map(
+                (f) => `
         <tr>
             <td><span class="conf-${f.confidence}">[${(f.confidence || "low").toUpperCase()}]</span></td>
             <td>${escapeHtml(shortRepo(f.repo))}</td>
@@ -49,9 +50,11 @@ function renderFindings(findings) {
             <td>${escapeHtml(f.rule_id)}</td>
             <td><code>${escapeHtml(f.masked)}</code></td>
             <td class="muted">${escapeHtml(f.ts || "")}</td>
+            <td class="muted">${f.commit_sha ? escapeHtml(f.commit_sha.slice(0, 8)) : "&mdash;"}</td>
         </tr>`
-        )
-        .join("");
+            )
+            .join("")
+        : `<tr><td colspan="7" class="muted">No findings yet.</td></tr>`;
 }
 
 function renderRules(rules) {
@@ -147,6 +150,48 @@ async function deleteRule(ruleId) {
     }
 }
 
+/* --- Playground: test arbitrary text against active rules + one-off regex --- */
+async function runPlayground() {
+    const payload = {
+        text: document.getElementById("pg-text").value,
+        pattern: document.getElementById("pg-pattern").value.trim() || null,
+    };
+    if (!payload.text.trim()) {
+        document.getElementById("pg-body").innerHTML =
+            `<tr><td colspan="5" class="muted">Enter a test string first.</td></tr>`;
+        return;
+    }
+    try {
+        const res = await fetch(`${API_BASE}/playground`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            alert(`Playground error: ${err.detail}`);
+            return;
+        }
+        const data = await res.json();
+        document.getElementById("pg-body").innerHTML = data.results.length
+            ? data.results
+                .map(
+                    (r) => `
+                <tr>
+                    <td>${escapeHtml(r.rule_id)}</td>
+                    <td><code>${escapeHtml(r.masked)}</code></td>
+                    <td>${r.entropy}</td>
+                    <td><span class="conf-${r.confidence}">${r.confidence.toUpperCase()}</span></td>
+                    <td>${r.severity.toUpperCase()}</td>
+                </tr>`
+                )
+                .join("")
+            : `<tr><td colspan="5" class="muted">No rule matched this input.</td></tr>`;
+    } catch (e) {
+        console.error("Playground request failed:", e);
+    }
+}
+
 function startAutoRefresh() {
     if (refreshTimer) clearInterval(refreshTimer);
     refreshTimer = setInterval(loadData, REFRESH_INTERVAL_MS);
@@ -163,6 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("open-add-rule").addEventListener("click", openModal);
     document.getElementById("cancel-add-rule").addEventListener("click", closeModal);
     document.getElementById("add-rule-form").addEventListener("submit", submitRule);
+    document.getElementById("pg-run").addEventListener("click", runPlayground);
     document.getElementById("rules-body").addEventListener("click", (e) => {
         const id = e.target?.dataset?.delete;
         if (id) deleteRule(id);
