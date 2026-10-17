@@ -111,11 +111,30 @@ body {
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
-.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
-.stat-card {
-    background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
-    padding: 1.25rem;
+.stats-grid { 
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 1rem; 
+    margin-bottom: 1.5rem; 
 }
+.stat-card {
+    background: var(--bg-card); 
+    border: 1px solid var(--border); 
+    border-radius: 8px;
+    padding: 1.25rem;
+    min-height: auto;
+}
+.runs-table {
+    margin-top: 1rem;
+    font-size: 0.875rem;
+}
+
+.runs-table td {
+    font-family: "SF Mono", "Monaco", "Inconsolata", "Fira Mono", monospace;
+}
+.action-passed { color: var(--text-success); }
+.action-blocked { color: var(--text-danger); }
+.action-reported { color: var(--text-warning); }
 .stat-label { color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 0.5rem; }
 .stat-value { font-size: 1.75rem; font-weight: 700; }
 .text-danger { color: var(--text-danger); }
@@ -138,3 +157,62 @@ code { background: var(--bg-secondary); padding: 0.2rem 0.4rem; border-radius: 4
 .conf-high { color: var(--text-danger); font-weight: bold; }
 .conf-medium { color: var(--text-warning); }
 .conf-low { color: var(--text-secondary); }
+
+/* Modal overlay: fixed position, never affects page layout or other tabs */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+.modal-overlay[hidden] { display: none; }
+
+.modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    width: 420px;
+    max-width: 90vw;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.modal h3 { margin-bottom: 1rem; }
+
+.form-group { margin-bottom: 0.9rem; }
+.form-group label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.3rem;
+}
+.form-group input,
+.form-group select {
+    width: 100%;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.875rem;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    margin-top: 1.2rem;
+}
+
+.btn-icon {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+.btn-icon:hover { color: var(--text-danger); }
+
+/* Stat cards stay compact regardless of content below the grid */
+.stats-grid { align-items: start; }

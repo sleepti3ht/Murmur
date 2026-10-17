@@ -1,3 +1,4 @@
+# dashboard/tauri/Cargo.toml
 [package]
 name = "murmur-dashboard"
 version = "1.9.0"
@@ -9,6 +10,7 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+# Добавлена фича "tray-icon"
+tauri = { version = "2", features = ["tray-icon"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -1,73 +1,139 @@
 # dashboard/api.py
+"""Local API server for the Murmur Dashboard."""
 import os
+import re
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from murmur.storage.sqlite import recent_runs, recent_findings
-from murmur.external_scan import scan_external_repo
+from murmur.storage.sqlite import recent_findings, recent_runs
 
 app = FastAPI(title="Murmur Dashboard API")
 
+# Local dev origins (Tauri dev server port may vary between runs)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["tauri://localhost",
+    allow_origins=[
+        "tauri://localhost",
         "http://localhost:1420",
         "http://127.0.0.1:1420",
         "http://localhost:1430",
-        "http://127.0.0.1:1430"],
+        "http://127.0.0.1:1430",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-class ScanRequest(BaseModel):
-    repo_url: str
-    max_commits: int = 100
+RULES_FILE = Path.home() / ".murmur" / "custom_rules.yaml"
+VALID_SEVERITIES = {"high", "medium", "low"}
 
-# Mock custom rules for v1.8 groundwork
-CUSTOM_RULES = [
-    {"id": "custom.telegram_bot", "pattern": r"\d{10}:[A-Za-z0-9_-]{35}", "severity": "high", "active": True},
-    {"id": "custom.stripe_key", "pattern": r"sk_live_[A-Za-z0-9]{24,}", "severity": "high", "active": True},
-]
+
+class RuleRequest(BaseModel):
+    id: str = Field(min_length=3)
+    pattern: str = Field(min_length=1)
+    severity: str = "medium"
+    description: str = ""
+
+
+def load_custom_rules() -> list[dict]:
+    """Read custom rules from YAML; tolerate missing or corrupt file."""
+    if not RULES_FILE.exists():
+        return []
+    try:
+        data = yaml.safe_load(RULES_FILE.read_text(encoding="utf-8")) or {}
+        return data.get("rules", [])
+    except yaml.YAMLError:
+        return []
+
+
+def save_custom_rules(rules: list[dict]) -> None:
+    """Atomic write: temp file + os.replace prevents torn reads by the hook."""
+    RULES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(dir=RULES_FILE.parent, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            yaml.safe_dump({"rules": rules}, f, sort_keys=False)
+        os.replace(tmp_path, RULES_FILE)
+    except Exception:
+        Path(tmp_path).unlink(missing_ok=True)
+        raise
+
 
 @app.get("/api/status")
 async def get_status():
     return {"status": "ok", "version": "1.9.0"}
 
+
 @app.get("/api/findings")
-async def get_findings(limit: int = 50):
-    try:
-        findings = recent_findings(limit)
-        return [dict(f) for f in findings]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+async def get_findings(limit: int = 100):
+    return [dict(f) for f in recent_findings(limit)]
+
 
 @app.get("/api/runs")
-async def get_runs(limit: int = 20):
-    try:
-        runs = recent_runs(limit)
-        return [dict(r) for r in runs]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+async def get_runs(limit: int = 100):
+    return [dict(r) for r in recent_runs(limit)]
+
 
 @app.get("/api/rules")
-async def get_custom_rules():
-    return {"rules": CUSTOM_RULES}
+async def get_rules():
+    return {"rules": load_custom_rules()}
+
+
+@app.post("/api/rules", status_code=201)
+async def add_rule(rule: RuleRequest):
+    """Create a custom detection rule after validating id, severity and regex."""
+    if rule.severity not in VALID_SEVERITIES:
+        raise HTTPException(status_code=422, detail="Invalid severity")
+    try:
+        re.compile(rule.pattern)
+    except re.error as e:
+        raise HTTPException(status_code=422, detail=f"Invalid regex: {e}")
+
+    rules = load_custom_rules()
+    if any(r.get("id") == rule.id for r in rules):
+        raise HTTPException(status_code=409, detail="Rule ID already exists")
+
+    rules.append(
+        {
+            "id": rule.id,
+            "pattern": rule.pattern,
+            "severity": rule.severity,
+            "description": rule.description,
+            "active": True,
+        }
+    )
+    save_custom_rules(rules)
+    return {"rules": rules}
+
+
+@app.delete("/api/rules/{rule_id}")
+async def delete_rule(rule_id: str):
+    rules = load_custom_rules()
+    filtered = [r for r in rules if r.get("id") != rule_id]
+    if len(filtered) == len(rules):
+        raise HTTPException(status_code=404, detail="Rule not found")
+    save_custom_rules(filtered)
+    return {"rules": filtered}
+
 
 @app.post("/api/scan")
-async def trigger_scan(request: ScanRequest):
-    try:
-        exit_code = scan_external_repo(request.repo_url, max_commits=request.max_commits, use_history=True)
-        return {"success": exit_code == 0, "exit_code": exit_code}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+async def trigger_scan(repo_url: str, max_commits: int = 100):
+    """Lazy import keeps startup light; scan runs synchronously in this MVP."""
+    from murmur.external_scan import scan_external_repo
+
+    exit_code = scan_external_repo(repo_url, max_commits=max_commits, use_history=True)
+    return {"success": exit_code == 0, "exit_code": exit_code}
+
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")

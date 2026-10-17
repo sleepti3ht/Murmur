@@ -9,10 +9,8 @@
 <body>
     <div class="container">
         <header class="header">
-            <div class="logo">🌑 Murmur Dashboard</div>
-            <div class="header-actions">
-                <button id="theme-toggle" class="btn-secondary">Toggle Theme</button>
-            </div>
+            <div class="logo">Murmur Dashboard</div>
+            <button id="theme-toggle" class="btn-secondary">Toggle Theme</button>
         </header>
 
         <nav class="tabs">
@@ -20,8 +18,7 @@
             <button class="tab-btn" data-tab="rules">Custom Rules (v1.8)</button>
         </nav>
 
-        <!-- Stats Cards -->
-        <div class="stats-grid" id="stats-container">
+        <section class="stats-grid">
             <div class="stat-card">
                 <div class="stat-label">Total Findings</div>
                 <div class="stat-value" id="stat-total">0</div>
@@ -33,10 +30,10 @@
             <div class="stat-card">
                 <div class="stat-label">Scans Today</div>
                 <div class="stat-value" id="stat-scans">0</div>
-            </div</div>
+            </div>
+        </section>
 
-        <!-- Findings Tab -->
-        <div id="tab-findings" class="tab-content active">
+        <section id="tab-findings" class="tab-content active">
             <div class="card">
                 <div class="card-header">
                     <h2>Recent Findings</h2>
@@ -61,14 +58,13 @@
                     <tbody id="findings-body"></tbody>
                 </table>
             </div>
-        </div>
+        </section>
 
-        <!-- Custom Rules Tab -->
-        <div id="tab-rules" class="tab-content">
+        <section id="tab-rules" class="tab-content">
             <div class="card">
                 <div class="card-header">
                     <h2>Custom Detection Rules</h2>
-                    <button class="btn-primary">+ Add Rule</button>
+                    <button id="open-add-rule" class="btn-primary">+ Add Rule</button>
                 </div>
                 <table>
                     <thead>
@@ -77,11 +73,45 @@
                             <th>Pattern</th>
                             <th>Severity</th>
                             <th>Status</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody id="rules-body"></tbody>
                 </table>
             </div>
+        </section>
+    </div>
+
+    <!-- Modal lives outside tab sections: fixed overlay, zero layout impact -->
+    <div id="add-rule-modal" class="modal-overlay" hidden>
+        <div class="modal">
+            <h3>Add Custom Rule</h3>
+            <form id="add-rule-form">
+                <div class="form-group">
+                    <label for="rule-id">Rule ID</label>
+                    <input id="rule-id" type="text" required placeholder="custom.my_rule">
+                </div>
+                <div class="form-group">
+                    <label for="rule-pattern">Regex Pattern</label>
+                    <input id="rule-pattern" type="text" required placeholder="\b[A-Z0-9]{16}\b">
+                </div>
+                <div class="form-group">
+                    <label for="rule-severity">Severity</label>
+                    <select id="rule-severity" class="select-input">
+                        <option value="high">High</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="rule-description">Description</label>
+                    <input id="rule-description" type="text" placeholder="Optional">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="cancel-add-rule" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Add Rule</button>
+                </div>
+            </form>
         </div>
     </div>
 
