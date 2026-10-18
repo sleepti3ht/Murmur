@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from murmur.core.detector import RULES, Rule, SecretDetector, _load_custom_rules
 from murmur.core.entropy import shannon_entropy
 from murmur.core.scoring import compute_confidence
-from murmur.storage.sqlite import recent_findings, recent_runs
+from murmur.storage.sqlite import recent_findings, recent_logs, recent_runs
 
 app = FastAPI(title="Murmur Dashboard API")
 
@@ -90,6 +90,11 @@ async def get_findings(limit: int = 100):
 async def get_runs(limit: int = 100):
     return [dict(r) for r in recent_runs(limit)]
 
+
+@app.get("/api/logs")
+async def get_logs(limit: int = 200):
+    """Return recent hook/application log rows for the dashboard Logs tab."""
+    return {"logs": [dict(r) for r in recent_logs(limit)]}
 
 @app.get("/api/rules")
 async def get_rules():
