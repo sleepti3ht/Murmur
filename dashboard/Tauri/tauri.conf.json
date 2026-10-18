@@ -14,7 +14,7 @@
         "height": 800,
         "resizable": true,
         "fullscreen": false,
-        "label": "main"
+        "devtools": true
       }
     ],
     "trayIcon": {
@@ -23,7 +23,7 @@
       "iconAsTemplate": false
     },
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:8000; style-src 'self' 'unsafe-inline'"
+      "csp": "default-src 'self' data: blob: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' http://127.0.0.1:8000 ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'"
     }
   }
 }
