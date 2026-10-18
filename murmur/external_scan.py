@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 from murmur.adapters.history import HistoryAdapter
 from murmur.core.detector import SecretDetector
 from murmur.alerting.console import ConsoleAlerter
-from murmur.storage.sqlite import record_findings, record_run
+from murmur.storage.sqlite import record_findings, record_log, record_run
 
 
 def parse_github_url(url: str) -> tuple[str, str]:

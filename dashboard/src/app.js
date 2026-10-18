@@ -7,18 +7,22 @@ let refreshTimer = null;
 
 async function loadData() {
     try {
-        const [findingsRes, runsRes, rulesRes] = await Promise.all([
+        const [findingsRes, runsRes, rulesRes, logsRes] = await Promise.all([
             fetch(`${API_BASE}/findings?limit=100`),
             fetch(`${API_BASE}/runs?limit=100`),
             fetch(`${API_BASE}/rules`),
+            fetch(`${API_BASE}/logs?limit=200`),
         ]);
         allFindings = await findingsRes.json();
         const runs = await runsRes.json();
         const rules = await rulesRes.json();
+        const logs = await logsRes.json();
 
         updateStats(allFindings, runs);
         renderFindings(allFindings);
         renderRules(rules.rules || []);
+        renderScans(runs);
+        renderLogs(logs.logs || []);
     } catch (err) {
         console.error("Failed to load data:", err);
     }
@@ -75,6 +79,43 @@ function renderRules(rules) {
         </tr>`
         )
         .join("");
+}
+function renderScans(runs) {
+    const tbody = document.getElementById("scans-body");
+    tbody.innerHTML = runs.length
+        ? runs
+            .map(
+                (r) => `
+        <tr>
+            <td class="muted">${escapeHtml(r.ts || "")}</td>
+            <td>${escapeHtml(shortRepo(r.repo || ""))}</td>
+            <td>${escapeHtml(r.mode || "")}</td>
+            <td>${r.files_scanned ?? 0}</td>
+            <td>${r.findings_count ?? 0}</td>
+            <td>${r.duration_ms ?? 0}</td>
+            <td><span class="action-${escapeHtml(r.action || "passed")}">${escapeHtml((r.action || "passed").toUpperCase())}</span></td>
+        </tr>`
+            )
+            .join("")
+        : `<tr><td colspan="7" class="muted">No scans recorded yet.</td></tr>`;
+}
+
+function renderLogs(logs) {
+    const tbody = document.getElementById("logs-body");
+    tbody.innerHTML = logs.length
+        ? logs
+            .map(
+                (l) => `
+        <tr>
+            <td class="muted">${escapeHtml(l.ts || "")}</td>
+            <td><span class="log-${escapeHtml(l.level || "info")}">${escapeHtml((l.level || "info").toUpperCase())}</span></td>
+            <td>${escapeHtml(l.source || "")}</td>
+            <td>${escapeHtml(l.repo ? shortRepo(l.repo) : "")}</td>
+            <td>${escapeHtml(l.message || "")}</td>
+        </tr>`
+            )
+            .join("")
+        : `<tr><td colspan="5" class="muted">No log entries yet.</td></tr>`;
 }
 
 function shortRepo(repo) {

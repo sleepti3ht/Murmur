@@ -117,3 +117,57 @@ def recent_findings(limit: int = 50) -> list[sqlite3.Row]:
         return con.execute(
             "SELECT * FROM findings ORDER BY id DESC LIMIT ?", (limit,)
         ).fetchall()
+
+
+LOGS_TABLE = """
+CREATE TABLE IF NOT EXISTS logs (
+    id INTEGER PRIMARY KEY,
+    ts TEXT NOT NULL DEFAULT (datetime('now')),
+    level TEXT NOT NULL,
+    source TEXT NOT NULL,
+    repo TEXT,
+    message TEXT NOT NULL
+);
+"""
+
+LOGS_RETENTION_LIMIT = 5000
+
+
+def _logs_connect():
+    # Mirrors the module-level DB path used by findings/runs tables
+    con = sqlite3.connect(Path.home() / ".murmur" / "findings.db", timeout=10)
+    con.row_factory = sqlite3.Row
+    return con
+
+
+def _ensure_logs_table(con) -> None:
+    """Create the logs table on first use; avoids schema migration code."""
+    con.execute(LOGS_TABLE)
+
+
+def record_log(level: str, source: str, message: str, repo: str | None = None) -> None:
+    """
+    Append one log row and prune history beyond LOGS_RETENTION_LIMIT.
+    Pruning runs in the same transaction as the insert, so retention is atomic
+    and concurrent hook processes never observe a partially pruned table.
+    """
+    with _logs_connect() as con:
+        _ensure_logs_table(con)
+        con.execute(
+            "INSERT INTO logs(level, source, repo, message) VALUES (?,?,?,?)",
+            (level, source, repo, message),
+        )
+        con.execute(
+            "DELETE FROM logs WHERE id NOT IN "
+            "(SELECT id FROM logs ORDER BY id DESC LIMIT ?)",
+            (LOGS_RETENTION_LIMIT,),
+        )
+
+
+def recent_logs(limit: int = 200) -> list:
+    """Return the most recent log rows, newest first."""
+    with _logs_connect() as con:
+        _ensure_logs_table(con)
+        return con.execute(
+            "SELECT * FROM logs ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()

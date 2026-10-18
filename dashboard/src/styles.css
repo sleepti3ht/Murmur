@@ -132,9 +132,14 @@ body {
 .runs-table td {
     font-family: "SF Mono", "Monaco", "Inconsolata", "Fira Mono", monospace;
 }
+/* Scan action badges (skip if already present) */
 .action-passed { color: var(--text-success); }
 .action-blocked { color: var(--text-danger); }
 .action-reported { color: var(--text-warning); }
+/* Log level badges */
+.log-info { color: var(--text-secondary); }
+.log-warning { color: var(--text-warning); }
+.log-error { color: var(--text-danger); font-weight: 600; }
 .stat-label { color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 0.5rem; }
 .stat-value { font-size: 1.75rem; font-weight: 700; }
 .text-danger { color: var(--text-danger); }

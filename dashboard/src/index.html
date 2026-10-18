@@ -17,6 +17,8 @@
             <button class="tab-btn active" data-tab="findings">Findings</button>
             <button class="tab-btn" data-tab="rules">Custom Rules</button>
             <button class="tab-btn" data-tab="playground">Playground</button>
+            <button class="tab-btn" data-tab="scans">Scans</button>
+            <button class="tab-btn" data-tab="logs">Logs</button>
         </nav>
 
         <section class="stats-grid">
@@ -108,6 +110,48 @@
                         </tr>
                     </thead>
                     <tbody id="pg-body"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="tab-scans" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Recent Scans</h2>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Repository</th>
+                            <th>Mode</th>
+                            <th>Files</th>
+                            <th>Findings</th>
+                            <th>Duration (ms)</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scans-body"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="tab-logs" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Client Logs</h2>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Level</th>
+                            <th>Source</th>
+                            <th>Repository</th>
+                            <th>Message</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs-body"></tbody>
                 </table>
             </div>
         </section>
