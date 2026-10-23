@@ -80,23 +80,19 @@ Most secret leaks happen *before* code review, CI, or push. A developer stages a
 
 ## 🖼️ Screenshots
 
-<!-- PLACEHOLDER: Replace with real screenshots -->
+
 
 | Dark theme | Light theme |
 | :---: | :---: |
 | ![dashboard-dark](docs/screenshots/dashboard-dark.png) | ![dashboard-light](docs/screenshots/dashboard-light.png) |
 
-| Findings view | Custom Rules |
+| Custom Rules | Playground |
 | :---: | :---: |
-| ![findings](docs/screenshots/findings.png) | ![rules](docs/screenshots/rules.png) |
+| ![rules](docs/screenshots/rules.png) | ![rules](docs/screenshots/playground.png) |
 
-| Playground | Scans & Logs |
+| Scans | Logs |
 | :---: | :---: |
-| ![playground](docs/screenshots/playground.png) | ![scans-logs](docs/screenshots/scans-logs.png) |
-
-| Pre-commit block | System tray |
-| :---: | :---: |
-| ![pre-commit](docs/screenshots/pre-commit.png) | ![tray](docs/screenshots/tray.png) |
+| ![scans](docs/screenshots/scans.png) | ![logs](docs/screenshots/logs.png) |
 
 ---
 

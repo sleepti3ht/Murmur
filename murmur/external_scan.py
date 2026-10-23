@@ -6,7 +6,6 @@ Uses temporary directory and automatic cleanup.
 
 Usage: python -m murmur.external_scan <repo_url> [--max-commits N]
 """
-import os
 import shutil
 import subprocess
 import sys
@@ -15,9 +14,9 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from murmur.adapters.history import HistoryAdapter
-from murmur.core.detector import SecretDetector
 from murmur.alerting.console import ConsoleAlerter
-from murmur.storage.sqlite import record_findings, record_log, record_run
+from murmur.core.detector import SecretDetector
+from murmur.storage.sqlite import record_findings, record_run
 
 
 def parse_github_url(url: str) -> tuple[str, str]:
@@ -32,7 +31,7 @@ def parse_github_url(url: str) -> tuple[str, str]:
     # Handle SSH URLs
     if url.startswith("git@github.com:"):
         url = url.replace("git@github.com:", "")
-    
+
     # Handle HTTPS URLs
     if url.startswith("https://github.com/"):
         parsed = urlparse(url)
@@ -40,12 +39,12 @@ def parse_github_url(url: str) -> tuple[str, str]:
         parts = path.split("/")
         if len(parts) >= 2:
             return parts[0], parts[1].replace(".git", "")
-    
+
     # Handle bare "owner/repo" format
     if "/" in url:
         parts = url.strip("/").split("/")
         return parts[0], parts[1].replace(".git", "")
-    
+
     raise ValueError(f"Invalid GitHub URL: {url}")
 
 
@@ -56,10 +55,10 @@ def clone_repo_temporarily(owner: str, repo: str, depth: int = 1) -> Path:
     """
     temp_dir = Path(tempfile.mkdtemp(prefix=f"murmur_{repo}_"))
     repo_url = f"https://github.com/{owner}/{repo}.git"
-    
+
     print(f"[MURMUR] Cloning {owner}/{repo} to temporary directory...")
     print(f"[MURMUR] Temp path: {temp_dir}")
-    
+
     try:
         subprocess.run(
             ["git", "clone", "--depth", str(depth), "--quiet", repo_url, str(temp_dir)],
@@ -93,26 +92,26 @@ def scan_external_repo(
         Exit code: 0 if no secrets found, 1 if secrets detected
     """
     import time
-    
+
     started = time.perf_counter()
     temp_path = None
-    
+
     try:
         # Parse URL
         owner, repo_name = parse_github_url(repo_url)
         full_name = f"{owner}/{repo_name}"
-        
+
         print(f"[MURMUR] External scan: {full_name}")
         print(f"[MURMUR] Mode: {'Full history' if use_history else 'HEAD only'}")
         print("=" * 70)
-        
+
         # Clone to temp directory
         temp_path = clone_repo_temporarily(owner, repo_name, depth=max_commits if use_history else 1)
-        
+
         # Load allowlist (from current directory or default)
         allowlist_file = Path("allowlist.txt")
         allowlist = allowlist_file.read_text().splitlines() if allowlist_file.exists() else []
-        
+
         # Scan repository
         if use_history:
             adapter = HistoryAdapter(
@@ -130,14 +129,14 @@ def scan_external_repo(
                 timeout_sec=60,
             )
             print("[MURMUR] Scanning HEAD...")
-        
+
         changes = adapter.get_changes()
         print(f"[MURMUR] Analyzing {len(changes)} lines...")
-        
+
         # Run detector
         detector = SecretDetector(allowlist=allowlist, dry_run=True)
         findings = detector.analyze(changes)
-        
+
         # Record results
         duration_ms = int((time.perf_counter() - started) * 1000)
         record_run(
@@ -149,30 +148,30 @@ def scan_external_repo(
             duration_ms,
             "completed",
         )
-        
+
         if findings:
             record_findings(findings, repo=full_name, action="external")
-        
+
         # Output results
         print("\n" + "=" * 70)
         alerter = ConsoleAlerter()
         alerter.notify(findings)
-        
+
         print(f"\n[MURMUR] Scan completed in {duration_ms}ms")
         print(f"[MURMUR] Found {len(findings)} potential secrets")
-        
+
         return 1 if findings else 0
-        
+
     except Exception as e:
         print(f"\n[MURMUR] Error: {e}", file=sys.stderr)
         return 2
-        
+
     finally:
         # Cleanup temporary directory
         if temp_path and temp_path.exists():
             try:
                 shutil.rmtree(temp_path, ignore_errors=True)
-                print(f"[MURMUR] Cleaned up temporary files")
+                print("[MURMUR] Cleaned up temporary files")
             except Exception as e:
                 print(f"[MURMUR] Warning: Failed to cleanup temp files: {e}")
 
@@ -185,15 +184,15 @@ def main() -> int:
         print("  python -m murmur.external_scan owner/repo")
         print("  python -m murmur.external_scan owner/repo --max-commits 50")
         return 1
-    
+
     repo_url = sys.argv[1]
     max_commits = 100
-    
+
     # Parse optional arguments
     for i, arg in enumerate(sys.argv[2:], 2):
         if arg == "--max-commits" and i + 1 < len(sys.argv):
             max_commits = int(sys.argv[i + 1])
-    
+
     return scan_external_repo(repo_url, max_commits=max_commits)
 
 

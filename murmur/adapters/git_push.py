@@ -72,7 +72,7 @@ class PrePushAdapter:
                 continue
             if raw.startswith("+++ "):
                 target = raw[4:].strip().strip('"')
-                current_file = target[2:] if target.startswith("b/") else target
+                current_file = target.removeprefix("b/")
                 continue
             hunk = HUNK_RE.match(raw)
             if hunk:

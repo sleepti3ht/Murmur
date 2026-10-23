@@ -4,10 +4,10 @@ Murmur Tray Observer.
 Monitors ~/.murmur/findings.db and shows native OS notifications on new findings.
 """
 import os
-import sys
-import time
 import sqlite3
+import sys
 import threading
+import time
 from pathlib import Path
 
 import pystray
@@ -33,13 +33,13 @@ def is_already_running():
     if LOCK_FILE.exists():
         try:
             # Check if the PID in the lock file is still alive
-            with open(LOCK_FILE, "r") as f:
+            with open(LOCK_FILE) as f:
                 pid = int(f.read().strip())
             os.kill(pid, 0) # Raises ProcessLookupError if dead
             return True
         except (ProcessLookupError, ValueError):
             LOCK_FILE.unlink(missing_ok=True)
-    
+
     with open(LOCK_FILE, "w") as f:
         f.write(str(os.getpid()))
     return False
@@ -51,22 +51,22 @@ def poll_db(icon: pystray.Icon):
         if not DB_PATH.exists():
             time.sleep(2)
             continue
-            
+
         try:
             # Read-only connection to avoid locking the git hook writer
             con = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
             con.row_factory = sqlite3.Row
-            
+
             # We only care about 'blocked' or 'reported' runs that have findings
             cursor = con.execute(
                 "SELECT * FROM runs WHERE id > ? AND action IN ('blocked', 'reported') ORDER BY id ASC",
                 (last_id,)
             )
             runs = cursor.fetchall()
-            
+
             for run in runs:
                 last_id = run['id']
-                
+
                 # Get the specific findings for this run to show in the toast
                 # (Matching by repo and approximate time is a simple heuristic)
                 findings_cursor = con.execute(
@@ -74,24 +74,24 @@ def poll_db(icon: pystray.Icon):
                     (run['repo'],)
                 )
                 findings = findings_cursor.fetchall()
-                
+
                 rules = ", ".join([f['rule_id'].split('.')[-1] for f in findings])
                 repo_name = Path(run['repo']).name
-                
+
                 title = "🚨 Murmur: Secret Blocked" if run['action'] == 'blocked' else "⚠️ Murmur: Secret Reported"
                 message = f"Repo: {repo_name}\nRules: {rules}\nAction: Commit {run['action']}"
-                
+
                 # Show native OS notification
                 notification.notify(
                     title=title,
                     message=message,
                     timeout=5,
                 )
-                
+
             con.close()
         except sqlite3.OperationalError:
             pass # DB locked by hook, retry next cycle
-            
+
         time.sleep(1.5) # Poll every 1.5 seconds
 
 def on_exit(icon, item):
@@ -106,20 +106,20 @@ def main():
         return
 
     print("[MURMUR TRAY] Starting observer... (Check your system tray)")
-    
+
     icon_image = create_icon_image()
     menu = pystray.Menu(
         pystray.MenuItem("Show History", lambda icon, item: print("History feature coming in v1.3")),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Exit", on_exit)
     )
-    
+
     icon = pystray.Icon("murmur_tray", icon_image, "Murmur Guardian", menu)
-    
+
     # Start polling in a daemon thread
     poll_thread = threading.Thread(target=poll_db, args=(icon,), daemon=True)
     poll_thread.start()
-    
+
     # Run the tray main loop
     icon.run()
 

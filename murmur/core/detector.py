@@ -64,7 +64,7 @@ def _load_custom_rules() -> list[Rule]:
     """
     if not CUSTOM_RULES_FILE.exists():
         return []
-    
+
     try:
         data = yaml.safe_load(CUSTOM_RULES_FILE.read_text(encoding="utf-8")) or {}
     except (yaml.YAMLError, OSError):
@@ -74,7 +74,7 @@ def _load_custom_rules() -> list[Rule]:
     for entry in data.get("rules", []):
         if not entry.get("active", True):
             continue
-        
+
         pattern_src = entry.get("pattern", "")
         try:
             compiled = re.compile(pattern_src)
@@ -84,7 +84,7 @@ def _load_custom_rules() -> list[Rule]:
                 file=sys.stderr,
             )
             continue
-        
+
         rules.append(
             Rule(
                 rule_id=entry.get("id", "custom.unknown"),
@@ -99,10 +99,10 @@ def _load_custom_rules() -> list[Rule]:
 
 class SecretDetector:
     """Core engine for detecting secrets in code changes."""
-    
+
     HEX64_RE = re.compile(r"^[a-fA-F0-9]{64}$")
     PLACEHOLDER_EXACT = {
-        "example", "dummy", "test", "changeme", "placeholder", 
+        "example", "dummy", "test", "changeme", "placeholder",
         "your_token", "secret", "password"
     }
 
@@ -117,10 +117,10 @@ class SecretDetector:
         else:
             self.dry_run = dry_run
         self.baseline_hashes: set[str] = baseline_hashes or set()
-        self.baseline_skipped = 0            
+        self.baseline_skipped = 0
         self.path_allowlist: set[str] = set()
         self.hash_allowlist: set[str] = set()
-        
+
         # Custom confidence overrides loaded from YAML
         self.confidence_overrides: dict[str, str] = {}
 
@@ -135,7 +135,7 @@ class SecretDetector:
 
         # Merge built-in rules with user-defined rules
         self.rules = list(RULES) + _load_custom_rules()
-        
+
         # Load confidence overrides from the same YAML file
         self._load_confidence_overrides()
 
@@ -156,7 +156,7 @@ class SecretDetector:
     def analyze(self, lines: list[dict]) -> list[dict]:
         """Analyze lines for potential secrets and return findings."""
         findings: list[dict] = []
-        
+
         for raw_line in lines:
             line = ChangeLine.model_validate(raw_line)
             if self._is_path_allowed(line.file):
@@ -208,14 +208,14 @@ class SecretDetector:
                 )
                 # Stop after first match per line to avoid duplicate alerts
                 break
-                
+
         return findings
 
     def _is_path_allowed(self, path: str) -> bool:
         """Check if a file path matches any allowlist pattern."""
         p = PurePosixPath(path).as_posix()
         return any(
-            p == pat or p.startswith(pat + "/") or fnmatch(p, pat) 
+            p == pat or p.startswith(pat + "/") or fnmatch(p, pat)
             for pat in self.path_allowlist
         )
 

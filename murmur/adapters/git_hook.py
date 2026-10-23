@@ -136,8 +136,7 @@ class GitHookAdapter(BaseAdapter):
 
     def _extract_diff_path(self, raw: str) -> str:
         target = raw.strip().strip('"')
-        if target.startswith("b/"):
-            target = target[2:]
+        target = target.removeprefix("b/")
         return self._normalize_path(target)
 
     def _normalize_path(self, path: str | bytes) -> str:

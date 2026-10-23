@@ -11,11 +11,11 @@ class ConsoleAlerter:
     def notify(self, findings: list[dict]) -> None:
         if not findings:
             return
-            
+
         print("\n[MURMUR] Potential secrets detected:")
         for f in findings:
             r = DetectionResult.model_validate(f)
-            
+
             # ASCII markers for confidence levels
             confidence_marker = {
                 "high": "[!]",
