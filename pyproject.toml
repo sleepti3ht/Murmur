@@ -11,32 +11,3 @@ dependencies = ["pydantic>=2.0", "pyyaml>=6.0"]
 
 [tool.setuptools.packages.find]
 include = ["murmur*"]
-
-[tool.ruff]
-line-length = 100
-target-version = "py312"
-
-[tool.ruff.lint]
-select = [
-    "F",      
-    "E",      
-    "W",      
-    "I",      
-    "UP",     
-    "B",      
-]
-
-extend-select = [
-    "SIM",    
-    "C4",     
-]
-
-ignore = [
-    "E501",   
-    "ERA",    
-    "T20",    
-]
-
-[tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401"]
-"tests/*.py" = ["T201"]
